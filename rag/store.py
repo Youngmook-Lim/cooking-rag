@@ -1,3 +1,4 @@
+import uuid
 import chromadb
 from rag.models import Chunk, Retrieved
 
@@ -22,13 +23,11 @@ class ChromaStore(VectorStore):
         self._col = self._client.get_or_create_collection(
             name=collection, metadata={"hnsw:space": "cosine"}
         )
-        self._next_id = self._col.count()
 
     def add(self, chunks: list[Chunk], vectors: list[list[float]]) -> None:
         ids, metadatas, documents = [], [], []
         for chunk in chunks:
-            ids.append(str(self._next_id))
-            self._next_id += 1
+            ids.append(uuid.uuid4().hex)
             metadatas.append(
                 {"post_id": chunk.post_id, "question_id": chunk.question_id}
             )

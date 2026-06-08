@@ -30,3 +30,4 @@ def test_query_returns_nearest_with_metadata():
     assert results[0].chunk.post_id == 5570
     assert results[0].chunk.question_id == 5567
     assert isinstance(results[0].score, float)
+    assert 0.0 <= results[0].score <= 1.0
