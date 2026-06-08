@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<posts>
+  <row Id="5567" PostTypeId="1" AcceptedAnswerId="5570" Score="30"
+       Title="Why did my mayonnaise break?"
+       Body="&lt;p&gt;My mayo separated. Why?&lt;/p&gt;"
+       Tags="&lt;emulsion&gt;&lt;sauce&gt;" />
+  <row Id="5570" PostTypeId="2" ParentId="5567" Score="42"
+       Body="&lt;p&gt;Emulsions break when oil is added too fast.&lt;/p&gt;" />
+  <row Id="5571" PostTypeId="2" ParentId="5567" Score="3"
+       Body="&lt;p&gt;Add a fresh yolk and whisk slowly.&lt;/p&gt;" />
+</posts>
