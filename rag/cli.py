@@ -14,8 +14,12 @@ def index(posts_xml):
     """Parse Posts.xml and build the vector index."""
     pipe = build_pipeline()
     docs = parse_posts(posts_xml)
+    answers = sum(1 for d in docs if d.question_id != d.post_id)
     pipe.index(docs)
-    click.echo(f"Indexed {pipe.store.count()} chunks from {len(docs)} posts.")
+    click.echo(
+        f"Indexed {pipe.store.count()} chunks from {answers} answers "
+        f"({len(docs)} posts parsed)."
+    )
 
 
 @cli.command()
