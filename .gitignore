@@ -1,1 +1,11 @@
 docs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Project artifacts
+.chroma/
+data/
