@@ -29,7 +29,8 @@ class ChromaStore(VectorStore):
         for chunk in chunks:
             ids.append(uuid.uuid4().hex)
             metadatas.append(
-                {"post_id": chunk.post_id, "question_id": chunk.question_id}
+                {"post_id": chunk.post_id, "question_id": chunk.question_id,
+                 "chunk_index": chunk.chunk_index}
             )
             documents.append(chunk.text)
         self._col.add(ids=ids, embeddings=vectors,
@@ -43,7 +44,8 @@ class ChromaStore(VectorStore):
         dists = res["distances"][0]
         for text, meta, dist in zip(docs, metas, dists):
             chunk = Chunk(text=text, post_id=int(meta["post_id"]),
-                          question_id=int(meta["question_id"]))
+                          question_id=int(meta["question_id"]),
+                          chunk_index=int(meta["chunk_index"]))
             out.append(Retrieved(chunk=chunk, score=1.0 - dist))  # cosine sim
         return out
 

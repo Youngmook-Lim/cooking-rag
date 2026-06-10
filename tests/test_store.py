@@ -31,3 +31,17 @@ def test_query_returns_nearest_with_metadata():
     assert results[0].chunk.question_id == 5567
     assert isinstance(results[0].score, float)
     assert 0.0 <= results[0].score <= 1.0
+
+
+def test_query_round_trips_chunk_index():
+    store = _store()
+    emb = FakeEmbedder(dim=16)
+    chunks = [
+        Chunk(text="second window text", post_id=5570, question_id=5567,
+              chunk_index=1),
+    ]
+    store.add(chunks, emb.embed([c.text for c in chunks]))
+
+    qvec = emb.embed(["second window text"])[0]
+    results = store.query(qvec, k=1)
+    assert results[0].chunk.chunk_index == 1

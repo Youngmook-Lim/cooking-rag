@@ -30,3 +30,10 @@ def test_overlap_repeats_tail_words():
     chunks = chunker.split(_answer(body))
     # second window starts 2 words before the 10-word boundary
     assert chunks[1].text.split()[0] == "8"
+
+
+def test_chunks_carry_sequential_index():
+    body = " ".join(str(i) for i in range(25))   # 25 words -> 3 windows
+    chunker = FixedSizeChunker(max_words=10, overlap=0)
+    chunks = chunker.split(_answer(body))
+    assert [c.chunk_index for c in chunks] == [0, 1, 2]

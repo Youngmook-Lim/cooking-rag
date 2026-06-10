@@ -19,6 +19,7 @@ class Chunk:
     text: str
     post_id: int
     question_id: int
+    chunk_index: int = 0      # position of this chunk within its source document
 
 
 @dataclass

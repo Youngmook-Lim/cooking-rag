@@ -28,6 +28,7 @@ class FixedSizeChunker(Chunker):
                     text=" ".join(window),
                     post_id=doc.post_id,
                     question_id=doc.question_id,
+                    chunk_index=len(chunks),
                 )
             )
             if start + self.max_words >= len(words):
