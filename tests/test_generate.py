@@ -1,5 +1,32 @@
+from types import SimpleNamespace
 from rag.models import Chunk, Retrieved
-from rag.generate import Generator, build_prompt, Answer
+from rag.generate import Generator, build_prompt, Answer, OpenRouterLLM
+
+
+class FakeOpenAIClient:
+    def __init__(self, reply):
+        self.received = {}
+        message = SimpleNamespace(content=reply)
+        choice = SimpleNamespace(message=message)
+        self._response = SimpleNamespace(choices=[choice])
+        self.chat = SimpleNamespace(
+            completions=SimpleNamespace(create=self._create)
+        )
+
+    def _create(self, **kwargs):
+        self.received = kwargs
+        return self._response
+
+
+def test_openrouter_llm_sends_model_and_returns_text():
+    client = FakeOpenAIClient(reply="Oil added too fast [5570].")
+    llm = OpenRouterLLM(model="anthropic/claude-sonnet-4", client=client)
+    out = llm.complete("why did my mayo break?")
+    assert out == "Oil added too fast [5570]."
+    assert client.received["model"] == "anthropic/claude-sonnet-4"
+    assert client.received["messages"] == [
+        {"role": "user", "content": "why did my mayo break?"}
+    ]
 
 
 class FakeLLM:

@@ -1,3 +1,4 @@
+import os
 import re
 from dataclasses import dataclass, field
 from rag.models import Retrieved
@@ -30,19 +31,24 @@ class LLM:
         raise NotImplementedError
 
 
-class ClaudeLLM(LLM):
-    def __init__(self, model: str = "claude-opus-4-8"):
-        import anthropic
-        self._client = anthropic.Anthropic()
+class OpenRouterLLM(LLM):
+    def __init__(self, model: str, client=None):
+        if client is None:
+            from openai import OpenAI
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=os.environ["OPENROUTER_API_KEY"],
+            )
+        self._client = client
         self._model = model
 
     def complete(self, prompt: str) -> str:
-        msg = self._client.messages.create(
+        resp = self._client.chat.completions.create(
             model=self._model,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
-        return msg.content[0].text
+        return resp.choices[0].message.content
 
 
 class Generator:
