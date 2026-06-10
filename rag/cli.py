@@ -1,6 +1,9 @@
 import click
+from dotenv import load_dotenv
 from rag.factory import build_pipeline
 from rag.ingest import parse_posts
+
+load_dotenv()
 
 
 @click.group()
