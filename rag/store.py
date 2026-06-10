@@ -15,7 +15,8 @@ class VectorStore:
 
 
 class ChromaStore(VectorStore):
-    def __init__(self, collection: str, persist_dir: str | None = None):
+    def __init__(self, collection: str, persist_dir: str | None = None,
+                 batch_size: int = 5000):
         if persist_dir:
             self._client = chromadb.PersistentClient(path=persist_dir)
         else:
@@ -23,6 +24,7 @@ class ChromaStore(VectorStore):
         self._col = self._client.get_or_create_collection(
             name=collection, metadata={"hnsw:space": "cosine"}
         )
+        self._batch_size = batch_size
 
     def add(self, chunks: list[Chunk], vectors: list[list[float]]) -> None:
         ids, metadatas, documents = [], [], []
@@ -33,8 +35,11 @@ class ChromaStore(VectorStore):
                  "chunk_index": chunk.chunk_index}
             )
             documents.append(chunk.text)
-        self._col.add(ids=ids, embeddings=vectors,
-                      metadatas=metadatas, documents=documents)
+        # Chroma caps a single add at ~5461 records; write in batches.
+        for i in range(0, len(ids), self._batch_size):
+            j = i + self._batch_size
+            self._col.add(ids=ids[i:j], embeddings=vectors[i:j],
+                          metadatas=metadatas[i:j], documents=documents[i:j])
 
     def query(self, vector: list[float], k: int) -> list[Retrieved]:
         res = self._col.query(query_embeddings=[vector], n_results=k)

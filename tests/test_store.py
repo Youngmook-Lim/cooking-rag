@@ -33,6 +33,24 @@ def test_query_returns_nearest_with_metadata():
     assert 0.0 <= results[0].score <= 1.0
 
 
+def test_add_splits_into_batches():
+    store = ChromaStore(collection="batch", persist_dir=None, batch_size=5)
+    real_add = store._col.add
+    sizes = []
+
+    def spy(**kwargs):
+        sizes.append(len(kwargs["ids"]))
+        return real_add(**kwargs)
+
+    store._col.add = spy
+    emb = FakeEmbedder(dim=16)
+    chunks = [Chunk(text=f"t{i}", post_id=i, question_id=1) for i in range(12)]
+    store.add(chunks, emb.embed([c.text for c in chunks]))
+
+    assert sizes == [5, 5, 2]
+    assert store.count() == 12
+
+
 def test_query_round_trips_chunk_index():
     store = _store()
     emb = FakeEmbedder(dim=16)
