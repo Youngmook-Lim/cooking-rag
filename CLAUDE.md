@@ -27,8 +27,8 @@ queries/probes. An accepted answer is the ground-truth target for its question.
 
 Working end-to-end: parse `Posts.xml` → chunk → embed → store → dense retrieve →
 generate a grounded, cited answer, driven by a `rag` CLI. Verified with real
-embedder + real Chroma + retrieval; only the live Claude call is unverified (needs an
-API key + the downloaded corpus).
+embedder + real Chroma + retrieval; only the live OpenRouter call is unverified
+(needs `OPENROUTER_API_KEY` + the downloaded corpus).
 
 ## Architecture
 
@@ -38,18 +38,21 @@ interface so the eval harness and retrieval upgrades can A/B implementations:
 - `models.py` — `Document`, `Chunk`, `Retrieved`, `Answer` dataclasses.
 - `ingest.py` — `parse_posts(path)`: `Posts.xml` → `Document`s (HTML stripped, tags
   parsed, accepted-answer flagged).
-- `chunk.py` — `Chunker` ABC + `FixedSizeChunker` (word-window).
+- `chunk.py` — `Chunker` ABC + `FixedSizeChunker` (word-window; stamps each chunk
+  with a sequential `chunk_index`).
 - `embed.py` — `Embedder` ABC + `SentenceTransformerEmbedder` (`bge-small-en-v1.5`,
   default) + `FakeEmbedder` (deterministic, offline, for tests).
 - `store.py` — `VectorStore` ABC + `ChromaStore` (cosine; uuid ids; metadata
-  round-trips post_id/question_id).
+  round-trips post_id/question_id/chunk_index; adds are batched under Chroma's max
+  batch size).
 - `retrieve.py` — `Retriever` ABC + `DenseRetriever`.
 - `generate.py` — `build_prompt`, `Generator` (citations + refusal below `min_score`),
-  `LLM` ABC + `ClaudeLLM` (`claude-opus-4-8`; reused as eval judge later).
+  `LLM` ABC + `OpenRouterLLM` (OpenAI SDK pointed at OpenRouter; model from
+  `OPENROUTER_MODEL`, default `anthropic/claude-sonnet-4`; reused as eval judge later).
 - `pipeline.py` — `RagPipeline.index(docs)` / `.query(question, k)`. **Enforces the
   key rule:** only answers (`question_id != post_id`) are indexed.
 - `factory.py` — `build_pipeline()` composition root wiring the real components.
-- `cli.py` — `rag index <Posts.xml>` and `rag ask "<question>" [-k N]`.
+- `cli.py` — `rag index <Posts.xml>` and `rag ask "<question>" [-k N]`; loads `.env`.
 
 ## Toolchain & commands
 
@@ -60,10 +63,15 @@ is gated behind `-m slow` so the default suite is fast and offline.
 uv sync --extra dev                 # install
 uv run pytest -m "not slow" -q      # fast suite (offline; uses FakeEmbedder/FakeLLM)
 uv run pytest -m slow               # real sentence-transformers smoke test
-export ANTHROPIC_API_KEY=sk-ant-... # needed for `rag ask` (live Claude)
+cp .env.example .env                # then set OPENROUTER_API_KEY (model defaults
+                                    # to anthropic/claude-sonnet-4; loaded via dotenv)
 uv run rag index data/Posts.xml     # build the index
 uv run rag ask "why did my mayonnaise break?"
 ```
+
+Config is read from `.env` (`OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL`).
+Note: `build_pipeline()` constructs the LLM, so even `rag index` needs
+`OPENROUTER_API_KEY` present (making LLM construction lazy is a flagged follow-up).
 
 ## Conventions
 
