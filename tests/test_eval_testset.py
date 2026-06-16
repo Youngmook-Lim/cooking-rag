@@ -16,6 +16,7 @@ def test_eligibility_requires_accepted_nonempty_answer():
         _q(1, "q one"), _a(11, 1, is_accepted=True),               # eligible
         _q(2, "q two"), _a(21, 2, is_accepted=False),             # no accepted
         _q(3, "q three"), _a(31, 3, body="  ", is_accepted=True),  # empty body
+        _q(4, "   "), _a(41, 4, is_accepted=True),                 # blank title
     ]
     cases = build_testset(docs, n=10, seed=0)
     assert [c.question_id for c in cases] == [1]

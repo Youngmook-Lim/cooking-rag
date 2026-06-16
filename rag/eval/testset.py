@@ -12,7 +12,8 @@ def build_testset(docs: list[Document], n: int, seed: int) -> list[TestCase]:
         for d in docs
         if d.question_id != d.post_id and d.is_accepted and d.body.strip()
     }
-    titles = {d.post_id: d.title for d in docs if d.question_id == d.post_id}
+    titles = {d.post_id: d.title for d in docs
+              if d.question_id == d.post_id and d.title.strip()}
     eligible = sorted(qid for qid in accepted if qid in titles)
     chosen = random.Random(seed).sample(eligible, min(n, len(eligible)))
     return [
@@ -25,9 +26,9 @@ def build_testset(docs: list[Document], n: int, seed: int) -> list[TestCase]:
 def save_testset(cases: list[TestCase], path: str) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps([vars(c) for c in cases], indent=2))
+    p.write_text(json.dumps([vars(c) for c in cases], indent=2), encoding="utf-8")
 
 
 def load_testset(path: str) -> list[TestCase]:
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     return [TestCase(**d) for d in data]
