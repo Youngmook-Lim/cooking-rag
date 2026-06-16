@@ -3,7 +3,7 @@ from rag.eval.models import EvalReport
 
 
 def distinct_answers(retrieved: list[Retrieved]) -> list[int]:
-    """post_ids in rank order, first occurrence wins (best rank kept)."""
+    """Distinct post_ids in retrieval order (input must be rank-ordered; first occurrence wins)."""
     seen: set[int] = set()
     ordered: list[int] = []
     for r in retrieved:
@@ -22,7 +22,7 @@ def rank_of(answer_id: int, ordered_ids: list[int]) -> int | None:
 
 
 def reciprocal_rank(rank: int | None) -> float:
-    return 1.0 / rank if rank else 0.0
+    return 1.0 / rank if rank is not None else 0.0
 
 
 def aggregate(ranks: list[int | None], ks: tuple[int, ...]) -> EvalReport:

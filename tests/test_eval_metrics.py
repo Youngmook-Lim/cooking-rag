@@ -30,3 +30,10 @@ def test_aggregate_hits_and_mrr():
     assert report.hit_at[1] == 0.25
     assert report.hit_at[5] == 0.75
     assert report.mrr == pytest.approx((1.0 + 1/3 + 0.0 + 0.5) / 4)
+
+
+def test_aggregate_empty_is_all_zero():
+    report = aggregate([], ks=(1, 5))
+    assert report.n_cases == 0
+    assert report.hit_at == {1: 0.0, 5: 0.0}
+    assert report.mrr == 0.0
