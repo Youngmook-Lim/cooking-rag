@@ -19,10 +19,10 @@ def test_eval_build_writes_testset(tmp_path, monkeypatch):
     )
     assert result.exit_code == 0
     assert out.exists()
-    assert "1 test case" in result.output
+    assert "Wrote 1 test case to" in result.output
 
 
-def test_eval_prints_table(monkeypatch):
+def test_eval_prints_table(tmp_path, monkeypatch):
     cases = [TestCase(question_id=1, query_text="q", accepted_post_id=11)]
     monkeypatch.setattr(cli_mod, "load_testset", lambda p: cases)
 
@@ -32,7 +32,9 @@ def test_eval_prints_table(monkeypatch):
                 chunk=Chunk(text="a", post_id=11, question_id=1), score=0.9)]
 
     monkeypatch.setattr(cli_mod, "build_retriever", lambda: FakeRetriever())
-    result = CliRunner().invoke(cli_mod.cli, ["eval", "--testset", "x.json"])
+    testset = tmp_path / "testset.json"
+    testset.write_text("[]")
+    result = CliRunner().invoke(cli_mod.cli, ["eval", "--testset", str(testset)])
     assert result.exit_code == 0
     assert "Hit@1" in result.output
     assert "1.00" in result.output

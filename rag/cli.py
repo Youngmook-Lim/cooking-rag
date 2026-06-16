@@ -51,18 +51,22 @@ def eval_build(posts_xml, n, seed, out):
     docs = parse_posts(posts_xml)
     cases = build_testset(docs, n=n, seed=seed)
     save_testset(cases, out)
-    click.echo(f"Wrote {len(cases)} test cases to {out}.")
+    noun = "test case" if len(cases) == 1 else "test cases"
+    click.echo(f"Wrote {len(cases)} {noun} to {out}.")
 
 
 @cli.command("eval")
 @click.option("--testset", "testset_path", default="data/eval/testset.json",
-              help="Test set JSON path.")
+              type=click.Path(exists=True), help="Test set JSON path.")
 @click.option("--fetch", default=50, help="Chunks to fetch before deduping.")
 def eval_cmd(testset_path, fetch):
     """Run Setup 1 retrieval evaluation and print the metrics table."""
+    ks = (1, 5, 10)
+    if fetch <= max(ks):
+        raise click.BadParameter(f"--fetch must exceed {max(ks)}", param_hint="--fetch")
     cases = load_testset(testset_path)
     retriever = build_retriever()
-    report = run_eval(cases, retriever, ks=(1, 5, 10), fetch_depth=fetch)
+    report = run_eval(cases, retriever, ks=ks, fetch_depth=fetch)
     click.echo(f"Setup 1 — retrieval (n={report.n_cases}, fetch={fetch})")
     click.echo("Hit@1   Hit@5   Hit@10   MRR")
     click.echo(
