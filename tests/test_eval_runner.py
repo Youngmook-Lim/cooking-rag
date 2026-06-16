@@ -33,3 +33,11 @@ def test_miss_when_answer_not_in_corpus():
     report = run_eval(cases, retriever, ks=(1, 5), fetch_depth=10)
     assert report.hit_at[1] == 0.0
     assert report.mrr == 0.0
+
+
+def test_empty_cases_is_all_zero():
+    retriever = _seeded_retriever()
+    report = run_eval([], retriever, ks=(1, 5), fetch_depth=10)
+    assert report.n_cases == 0
+    assert report.hit_at == {1: 0.0, 5: 0.0}
+    assert report.mrr == 0.0

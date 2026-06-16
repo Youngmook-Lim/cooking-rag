@@ -6,7 +6,8 @@ from rag.eval.metrics import distinct_answers, rank_of, aggregate
 def run_eval(cases: list[TestCase], retriever: Retriever,
              ks: tuple[int, ...] = (1, 5, 10),
              fetch_depth: int = 50) -> EvalReport:
-    assert fetch_depth > max(ks), "fetch_depth must exceed max(ks)"
+    if fetch_depth <= max(ks):
+        raise ValueError(f"fetch_depth ({fetch_depth}) must exceed max(ks) ({max(ks)})")
     ranks: list[int | None] = []
     for case in cases:
         retrieved = retriever.retrieve(case.query_text, k=fetch_depth)
