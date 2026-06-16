@@ -2,7 +2,7 @@ import os
 from rag.chunk import FixedSizeChunker
 from rag.embed import SentenceTransformerEmbedder
 from rag.store import ChromaStore
-from rag.retrieve import DenseRetriever
+from rag.retrieve import DenseRetriever, Retriever
 from rag.generate import Generator, OpenRouterLLM
 from rag.pipeline import RagPipeline
 
@@ -15,9 +15,20 @@ def _model_name() -> str:
     return os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
 
 
-def build_pipeline() -> RagPipeline:
+def _embedder_and_store():
     embedder = SentenceTransformerEmbedder()
     store = ChromaStore(collection=COLLECTION, persist_dir=PERSIST_DIR)
+    return embedder, store
+
+
+def build_retriever() -> Retriever:
+    """Embedder + persisted store + dense retriever. No LLM (no API key needed)."""
+    embedder, store = _embedder_and_store()
+    return DenseRetriever(embedder=embedder, store=store)
+
+
+def build_pipeline() -> RagPipeline:
+    embedder, store = _embedder_and_store()
     return RagPipeline(
         chunker=FixedSizeChunker(max_words=256, overlap=32),
         embedder=embedder,
