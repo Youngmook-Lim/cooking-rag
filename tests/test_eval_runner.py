@@ -41,3 +41,24 @@ def test_empty_cases_is_all_zero():
     assert report.n_cases == 0
     assert report.hit_at == {1: 0.0, 5: 0.0}
     assert report.mrr == 0.0
+
+
+def test_multichunk_answer_dedupes_to_single_rank():
+    emb = FakeEmbedder(dim=16)
+    store = ChromaStore(collection="evalmulti", persist_dir=None)
+    chunks = [
+        Chunk(text="emulsion broke part one", post_id=5570, question_id=5567),
+        Chunk(text="emulsion broke part two", post_id=5570, question_id=5567,
+              chunk_index=1),
+        Chunk(text="emulsion broke part three", post_id=5570, question_id=5567,
+              chunk_index=2),
+        Chunk(text="sourdough starter tips", post_id=9001, question_id=9000),
+        Chunk(text="sharpening a chef knife", post_id=7200, question_id=7100),
+    ]
+    store.add(chunks, emb.embed([c.text for c in chunks]))
+    retriever = DenseRetriever(embedder=emb, store=store)
+    cases = [TestCase(question_id=5567, query_text="emulsion broke part two",
+                      accepted_post_id=5570)]
+    report = run_eval(cases, retriever, ks=(1, 5), fetch_depth=10)
+    assert report.hit_at[1] == 1.0
+    assert report.mrr == 1.0
