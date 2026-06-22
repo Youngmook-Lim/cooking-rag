@@ -13,6 +13,9 @@ class VectorStore:
     def count(self) -> int:
         raise NotImplementedError
 
+    def get_all_chunks(self) -> list[Chunk]:
+        raise NotImplementedError
+
 
 class ChromaStore(VectorStore):
     def __init__(self, collection: str, persist_dir: str | None = None,
@@ -56,3 +59,20 @@ class ChromaStore(VectorStore):
 
     def count(self) -> int:
         return self._col.count()
+
+    def get_all_chunks(self, page_size: int = 5000) -> list[Chunk]:
+        out: list[Chunk] = []
+        offset = 0
+        while True:
+            res = self._col.get(include=["documents", "metadatas"],
+                                 limit=page_size, offset=offset)
+            docs = res["documents"]
+            if not docs:
+                break
+            metas = res["metadatas"]
+            for text, meta in zip(docs, metas):
+                out.append(Chunk(text=text, post_id=int(meta["post_id"]),
+                                 question_id=int(meta["question_id"]),
+                                 chunk_index=int(meta["chunk_index"])))
+            offset += len(docs)
+        return out

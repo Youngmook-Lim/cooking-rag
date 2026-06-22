@@ -2,7 +2,7 @@ import os
 from rag.chunk import FixedSizeChunker
 from rag.embed import SentenceTransformerEmbedder
 from rag.store import ChromaStore
-from rag.retrieve import DenseRetriever, Retriever
+from rag.retrieve import DenseRetriever, Retriever, BM25Retriever, HybridRetriever
 from rag.generate import Generator, OpenRouterLLM
 from rag.pipeline import RagPipeline
 
@@ -21,10 +21,28 @@ def _embedder_and_store():
     return embedder, store
 
 
-def build_retriever() -> Retriever:
-    """Embedder + persisted store + dense retriever. No LLM (no API key needed)."""
+def build_retriever(kind: str = "dense") -> Retriever:
+    """dense | bm25 | hybrid. No LLM (no API key needed)."""
+    if kind not in ("dense", "bm25", "hybrid"):
+        raise ValueError(f"unknown retriever kind: {kind}")
     embedder, store = _embedder_and_store()
-    return DenseRetriever(embedder=embedder, store=store)
+    if kind == "dense":
+        return DenseRetriever(embedder=embedder, store=store)
+    if kind == "bm25":
+        return BM25Retriever(store.get_all_chunks())
+    return HybridRetriever([
+        DenseRetriever(embedder=embedder, store=store),
+        BM25Retriever(store.get_all_chunks()),
+    ])
+
+
+def build_all_retrievers() -> dict[str, Retriever]:
+    """All three retrievers, sharing one embedder/store/chunks/BM25 build."""
+    embedder, store = _embedder_and_store()
+    chunks = store.get_all_chunks()
+    dense = DenseRetriever(embedder=embedder, store=store)
+    sparse = BM25Retriever(chunks)
+    return {"dense": dense, "bm25": sparse, "hybrid": HybridRetriever([dense, sparse])}
 
 
 def build_pipeline() -> RagPipeline:
