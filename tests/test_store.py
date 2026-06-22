@@ -65,6 +65,26 @@ def test_query_round_trips_chunk_index():
     assert results[0].chunk.chunk_index == 1
 
 
+def test_get_all_chunks_paginates():
+    emb = FakeEmbedder(dim=16)
+    store = ChromaStore(collection="page", persist_dir=None)
+    chunks = [Chunk(text=f"t{i}", post_id=i, question_id=1, chunk_index=0)
+              for i in range(5)]
+    store.add(chunks, emb.embed([c.text for c in chunks]))
+
+    real_get = store._col.get
+    offsets = []
+
+    def spy(**kwargs):
+        offsets.append(kwargs.get("offset"))
+        return real_get(**kwargs)
+
+    store._col.get = spy
+    got = store.get_all_chunks(page_size=2)
+    assert {c.post_id for c in got} == {0, 1, 2, 3, 4}
+    assert len(offsets) == 4   # offsets 0,2,4 return data; 6 returns empty -> stop
+
+
 def test_get_all_chunks_round_trips():
     emb = FakeEmbedder(dim=16)
     store = ChromaStore(collection="all", persist_dir=None)
