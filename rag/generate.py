@@ -19,7 +19,7 @@ def build_prompt(question: str, retrieved: list[Retrieved]) -> str:
     )
     return (
         "You are a cooking expert. Answer the question using ONLY the sources "
-        "below. Cite the post id in square brackets, e.g. [5570], after each claim. "
+        "below. Do not use your memory or search the internet. Cite the post id in square brackets, e.g. [5570], after each claim. "
         "If the sources do not contain the answer, say you don't know.\n\n"
         f"Sources:\n{sources}\n\n"
         f"Question: {question}\n\nAnswer:"
