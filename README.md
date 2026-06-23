@@ -24,8 +24,8 @@ Sources:
 Three goals, in priority order:
 
 1. **Learn RAG internals** by building each component from scratch.
-2. **A portfolio piece** whose differentiator is a rigorous **evaluation harness** — not
-   just "it works," but *measured* retrieval quality with a reproducible metrics table.
+2. **Rigorous evaluation** as the differentiator — not just "it works," but *measured*
+   retrieval quality with a reproducible metrics table.
 3. A **"beats Google on long-tail cooking questions"** demo.
 
 The cooking corpus was chosen for the vivid demo contrast and because Stack Exchange's
