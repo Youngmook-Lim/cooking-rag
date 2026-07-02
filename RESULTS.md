@@ -13,12 +13,12 @@ mean.
 | 2026-06-16 | bge-small-en-v1.5 | fixed 256/32 | **dense** | 0.23 | 0.48 | 0.55 | 0.34 | baseline |
 | 2026-06-16 | bge-small-en-v1.5 | fixed 256/32 | bm25 | 0.15 | 0.29 | 0.37 | 0.22 | hand-built BM25 |
 | 2026-06-16 | bge-small-en-v1.5 | fixed 256/32 | hybrid (RRF k=60) | 0.21 | 0.45 | 0.54 | 0.31 | unweighted RRF; below dense |
+| 2026-07-02 | bge-small-en-v1.5 | fixed 256/32 | dense | 0.25 | 0.51 | 0.59 | 0.36 | + bge query prefix (best) |
 
 ## Backlog (planned experiments)
 
 Each should add a row above when run. See the project notes for cost/effort.
 
-- bge query-instruction prefix (query-side only; no re-index)
 - weighted RRF (down-weight BM25)
 - OpenAI embeddings (`text-embedding-3-small`/`-large`; rebuild index)
 - chunking sweep (`max_words`/`overlap`; sentence/semantic chunking)
