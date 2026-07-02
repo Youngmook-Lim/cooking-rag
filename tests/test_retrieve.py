@@ -18,6 +18,31 @@ def test_dense_retriever_finds_relevant_chunk():
     assert results[0].chunk.post_id == 5570
 
 
+def test_dense_retriever_embeds_query_via_embed_query():
+    from rag.embed import FakeEmbedder
+    from rag.store import ChromaStore
+    from rag.retrieve import DenseRetriever
+
+    class RecordingEmbedder(FakeEmbedder):
+        def __init__(self):
+            super().__init__(dim=16)
+            self.query_prefix = "Q: "
+            self.query_calls = []
+
+        def embed_query(self, texts):
+            self.query_calls.append(list(texts))
+            return super().embed_query(texts)
+
+    emb = RecordingEmbedder()
+    store = ChromaStore(collection="prefix", persist_dir=None)
+    chunks = [Chunk(text="mayonnaise emulsion broke", post_id=5570, question_id=5567)]
+    store.add(chunks, emb.embed([c.text for c in chunks]))
+
+    retriever = DenseRetriever(embedder=emb, store=store)
+    retriever.retrieve("why did my mayo break", k=1)
+    assert emb.query_calls == [["why did my mayo break"]]
+
+
 def test_bm25_retriever_ranks_by_keyword():
     from rag.retrieve import BM25Retriever
     chunks = [

@@ -17,6 +17,19 @@ def test_fake_embedder_differs_by_text():
     assert v1 != v2
 
 
+def test_embed_query_defaults_to_no_prefix():
+    from rag.embed import FakeEmbedder
+    emb = FakeEmbedder(dim=16)
+    assert emb.embed_query(["hello"]) == emb.embed(["hello"])
+
+
+def test_embed_query_applies_query_prefix():
+    from rag.embed import FakeEmbedder
+    emb = FakeEmbedder(dim=16)
+    emb.query_prefix = "Q: "
+    assert emb.embed_query(["hello"]) == emb.embed(["Q: hello"])
+
+
 @pytest.mark.slow
 def test_real_embedder_smoke():
     from rag.embed import SentenceTransformerEmbedder
@@ -24,3 +37,15 @@ def test_real_embedder_smoke():
     vecs = emb.embed(["why did my mayonnaise break?"])
     assert len(vecs) == 1
     assert len(vecs[0]) == emb.dim
+
+
+@pytest.mark.slow
+def test_sentence_transformer_query_prefix_changes_vector():
+    from rag.embed import SentenceTransformerEmbedder, BGE_QUERY_PREFIX
+    emb = SentenceTransformerEmbedder()
+    assert emb.query_prefix == BGE_QUERY_PREFIX
+    q = "why did my mayonnaise break"
+    assert emb.embed_query([q]) != emb.embed([q])          # prefix changes the vector
+
+    plain = SentenceTransformerEmbedder(query_prefix="")
+    assert plain.embed_query([q]) == plain.embed([q])      # override disables it
