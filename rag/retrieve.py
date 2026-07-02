@@ -17,7 +17,7 @@ class DenseRetriever(Retriever):
         self.store = store
 
     def retrieve(self, query: str, k: int) -> list[Retrieved]:
-        qvec = self.embedder.embed([query])[0]
+        qvec = self.embedder.embed_query([query])[0]
         return self.store.query(qvec, k=k)
 
 

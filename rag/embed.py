@@ -3,12 +3,19 @@ import struct
 from abc import ABC, abstractmethod
 
 
+BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
+
+
 class Embedder(ABC):
     dim: int
+    query_prefix: str = ""
 
     @abstractmethod
     def embed(self, texts: list[str]) -> list[list[float]]:
         ...
+
+    def embed_query(self, texts: list[str]) -> list[list[float]]:
+        return self.embed([self.query_prefix + t for t in texts])
 
 
 class FakeEmbedder(Embedder):
@@ -36,10 +43,12 @@ class FakeEmbedder(Embedder):
 
 
 class SentenceTransformerEmbedder(Embedder):
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5",
+                 query_prefix: str = BGE_QUERY_PREFIX):
         from sentence_transformers import SentenceTransformer
         self._model = SentenceTransformer(model_name)
         self.dim = self._model.get_embedding_dimension()
+        self.query_prefix = query_prefix
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vecs = self._model.encode(texts, normalize_embeddings=True)
