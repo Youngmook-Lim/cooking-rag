@@ -34,17 +34,19 @@ class BM25Retriever(Retriever):
 
 
 class HybridRetriever(Retriever):
-    def __init__(self, retrievers: list[Retriever], k_rrf: int = 60):
+    def __init__(self, retrievers: list[Retriever], weights: list[float] | None = None,
+                 k_rrf: int = 60):
         self.retrievers = retrievers
+        self.weights = weights if weights is not None else [1.0] * len(retrievers)
         self.k_rrf = k_rrf
 
     def retrieve(self, query: str, k: int) -> list[Retrieved]:
         fused: dict[tuple[int, int], float] = {}
         chosen: dict[tuple[int, int], Retrieved] = {}
-        for retriever in self.retrievers:
+        for weight, retriever in zip(self.weights, self.retrievers):
             for rank, r in enumerate(retriever.retrieve(query, k), start=1):
                 key = (r.chunk.post_id, r.chunk.chunk_index)
-                fused[key] = fused.get(key, 0.0) + 1.0 / (self.k_rrf + rank)
+                fused[key] = fused.get(key, 0.0) + weight * 1.0 / (self.k_rrf + rank)
                 chosen.setdefault(key, r)
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
         return [Retrieved(chunk=chosen[key].chunk, score=score)
