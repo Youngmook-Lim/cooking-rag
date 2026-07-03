@@ -107,3 +107,31 @@ def test_hybrid_weight_downweights_a_retriever():
     weighted = HybridRetriever([dense, sparse], weights=[1.0, 0.3])
     w_ids = [r.chunk.post_id for r in weighted.retrieve("q", k=5)]
     assert w_ids.index(1) < w_ids.index(2)     # down-weighting sparse flips the order
+
+
+def test_reranking_retriever_overfetches_and_reorders():
+    from rag.retrieve import RerankingRetriever, Retriever
+    from rag.rerank import FakeReranker
+    from rag.models import Retrieved
+
+    def _ret(text, post_id):
+        return Retrieved(
+            chunk=Chunk(text=text, post_id=post_id, question_id=1), score=0.0)
+
+    class _Base(Retriever):
+        def __init__(self):
+            self.asked_k = None
+        def retrieve(self, query, k):
+            self.asked_k = k
+            return [
+                _ret("best pan for steak", 1),
+                _ret("mayonnaise emulsions break when oil added fast", 2),
+                _ret("how to store mayonnaise", 3),
+            ]
+
+    base = _Base()
+    retriever = RerankingRetriever(base, FakeReranker(), pool_size=50)
+    out = retriever.retrieve("why did my mayonnaise break", k=2)
+    assert base.asked_k == 50            # over-fetched the pool
+    assert len(out) == 2                 # returned k
+    assert out[0].chunk.post_id == 2     # relevant chunk floated to #1
