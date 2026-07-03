@@ -21,6 +21,13 @@ def _embedder_and_store():
     return embedder, store
 
 
+def build_dense_and_bm25() -> tuple[Retriever, Retriever]:
+    """Shared dense + BM25 build (embedder, store, chunks, BM25 index built once)."""
+    embedder, store = _embedder_and_store()
+    chunks = store.get_all_chunks()
+    return DenseRetriever(embedder=embedder, store=store), BM25Retriever(chunks)
+
+
 def build_retriever(kind: str = "dense") -> Retriever:
     """dense | bm25 | hybrid. No LLM (no API key needed)."""
     if kind not in ("dense", "bm25", "hybrid"):
@@ -38,10 +45,7 @@ def build_retriever(kind: str = "dense") -> Retriever:
 
 def build_all_retrievers() -> dict[str, Retriever]:
     """All three retrievers, sharing one embedder/store/chunks/BM25 build."""
-    embedder, store = _embedder_and_store()
-    chunks = store.get_all_chunks()
-    dense = DenseRetriever(embedder=embedder, store=store)
-    sparse = BM25Retriever(chunks)
+    dense, sparse = build_dense_and_bm25()
     return {"dense": dense, "bm25": sparse, "hybrid": HybridRetriever([dense, sparse])}
 
 
