@@ -3,6 +3,7 @@ from rag.embed import Embedder
 from rag.store import VectorStore
 from rag.models import Chunk, Retrieved
 from rag.bm25 import BM25Index
+from rag.rerank import Reranker
 
 
 class Retriever(ABC):
@@ -51,3 +52,14 @@ class HybridRetriever(Retriever):
         ranked = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
         return [Retrieved(chunk=chosen[key].chunk, score=score)
                 for key, score in ranked]
+
+
+class RerankingRetriever(Retriever):
+    def __init__(self, base: Retriever, reranker: Reranker, pool_size: int = 50):
+        self.base = base
+        self.reranker = reranker
+        self.pool_size = pool_size
+
+    def retrieve(self, query: str, k: int) -> list[Retrieved]:
+        candidates = self.base.retrieve(query, self.pool_size)
+        return self.reranker.rerank(query, candidates, k)

@@ -14,6 +14,24 @@ mean.
 | 2026-06-16 | bge-small-en-v1.5 | fixed 256/32 | bm25 | 0.15 | 0.29 | 0.37 | 0.22 | hand-built BM25 |
 | 2026-06-16 | bge-small-en-v1.5 | fixed 256/32 | hybrid (RRF k=60) | 0.21 | 0.45 | 0.54 | 0.31 | unweighted RRF; below dense |
 | 2026-07-02 | bge-small-en-v1.5 | fixed 256/32 | **dense** | 0.25 | 0.51 | 0.59 | 0.36 | + bge query prefix (best) |
+| 2026-07-03 | bge-small-en-v1.5 | fixed 256/32 | dense + rerank (bge-reranker-base) | 0.19 | 0.42 | 0.52 | 0.29 | ↓ on this metric — see note below |
+
+## Cross-encoder reranker (2026-07-03)
+
+Reranked dense's top-50 with `bge-reranker-base` (`dense + rerank` row above). It scores
+**lower on accepted-ID Hit@k**, but investigation shows this is the **metric, not the
+reranker**: it correctly promotes genuinely-relevant chunks that simply aren't the one
+*accepted* post. Concrete case — Q "Do some fish smell fishier? Why?": the reranker put
+*"the fishy smell arises from the production of…"* (score 0.99) and *"fish only smell
+fishy when no longer fresh"* (0.93) **above** the accepted answer about "super smellers"
+(0.88) — arguably better answers to the literal question, but scored as misses. The
+reranker also helps sharply when the accepted answer *is* the best match (e.g. yogurt
+rank 12→1, sourdough 46→20).
+
+**Conclusion:** reranking can't be fairly judged by accepted-ID Hit@k (it optimizes
+topical relevance, not "is this the accepted post"). Not wired into `ask`; **the
+LLM-judge answer-quality metric is the prerequisite to evaluate it properly.** The
+`Reranker` / `RerankingRetriever` / `rag eval --retriever rerank` machinery remains.
 
 ## Weighted-RRF sweep (2026-07-03)
 
@@ -36,9 +54,10 @@ The weighted `HybridRetriever` and the `eval-sweep` tool remain for future use.
 
 Each should add a row above when run. See the project notes for cost/effort.
 
+- **LLM-judge answer-quality metric (faithfulness + correctness)** — now the priority;
+  prerequisite to fairly evaluate reranking (see cross-encoder note above)
 - OpenAI embeddings (`text-embedding-3-small`/`-large`; rebuild index)
 - chunking sweep (`max_words`/`overlap`; sentence/semantic chunking)
-- cross-encoder reranker over top-k
 - query preprocessing (expansion / HyDE / decomposition)
 
 ## Notes
