@@ -2,13 +2,16 @@ import os
 from rag.chunk import FixedSizeChunker
 from rag.embed import SentenceTransformerEmbedder
 from rag.store import ChromaStore
-from rag.retrieve import DenseRetriever, Retriever, BM25Retriever, HybridRetriever
+from rag.retrieve import (DenseRetriever, Retriever, BM25Retriever,
+                         HybridRetriever, RerankingRetriever)
+from rag.rerank import CrossEncoderReranker
 from rag.generate import Generator, OpenRouterLLM
 from rag.pipeline import RagPipeline
 
 PERSIST_DIR = ".chroma"
 COLLECTION = "cooking_baseline"
 DEFAULT_MODEL = "anthropic/claude-sonnet-4"
+DEFAULT_RERANK_MODEL = "BAAI/bge-reranker-base"
 
 
 def _model_name() -> str:
@@ -29,14 +32,19 @@ def build_dense_and_bm25() -> tuple[Retriever, Retriever]:
 
 
 def build_retriever(kind: str = "dense") -> Retriever:
-    """dense | bm25 | hybrid. No LLM (no API key needed)."""
-    if kind not in ("dense", "bm25", "hybrid"):
+    """dense | bm25 | hybrid | rerank. No LLM (no API key needed)."""
+    if kind not in ("dense", "bm25", "hybrid", "rerank"):
         raise ValueError(f"unknown retriever kind: {kind}")
     embedder, store = _embedder_and_store()
     if kind == "dense":
         return DenseRetriever(embedder=embedder, store=store)
     if kind == "bm25":
         return BM25Retriever(store.get_all_chunks())
+    if kind == "rerank":
+        return RerankingRetriever(
+            DenseRetriever(embedder=embedder, store=store),
+            CrossEncoderReranker(DEFAULT_RERANK_MODEL),
+        )
     return HybridRetriever([
         DenseRetriever(embedder=embedder, store=store),
         BM25Retriever(store.get_all_chunks()),
@@ -44,9 +52,14 @@ def build_retriever(kind: str = "dense") -> Retriever:
 
 
 def build_all_retrievers() -> dict[str, Retriever]:
-    """All three retrievers, sharing one embedder/store/chunks/BM25 build."""
+    """All retrievers, sharing one embedder/store/chunks/BM25 build."""
     dense, sparse = build_dense_and_bm25()
-    return {"dense": dense, "bm25": sparse, "hybrid": HybridRetriever([dense, sparse])}
+    return {
+        "dense": dense,
+        "bm25": sparse,
+        "hybrid": HybridRetriever([dense, sparse]),
+        "rerank": RerankingRetriever(dense, CrossEncoderReranker(DEFAULT_RERANK_MODEL)),
+    }
 
 
 def build_pipeline() -> RagPipeline:

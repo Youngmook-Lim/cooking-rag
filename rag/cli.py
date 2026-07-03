@@ -61,7 +61,7 @@ def eval_build(posts_xml, n, seed, out):
 @click.option("--testset", "testset_path", default="data/eval/testset.json",
               type=click.Path(exists=True), help="Test set JSON path.")
 @click.option("--retriever", "kind",
-              type=click.Choice(["dense", "bm25", "hybrid"]), default="dense",
+              type=click.Choice(["dense", "bm25", "hybrid", "rerank"]), default="dense",
               help="Retriever to evaluate.")
 @click.option("--fetch", default=50, help="Chunks to fetch before deduping.")
 def eval_cmd(testset_path, kind, fetch):

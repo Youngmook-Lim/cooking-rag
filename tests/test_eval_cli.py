@@ -106,3 +106,26 @@ def test_eval_sweep_prints_row_per_weight(tmp_path, monkeypatch):
     assert "bm25_weight" in result.output
     for w in ("0.0", "0.5", "1.0"):
         assert w in result.output
+
+
+def test_eval_accepts_rerank_retriever(tmp_path, monkeypatch):
+    cases = [TestCase(question_id=1, query_text="q", accepted_post_id=11)]
+    monkeypatch.setattr(cli_mod, "load_testset", lambda p: cases)
+    seen = {}
+
+    class FakeRetriever:
+        def retrieve(self, query, k):
+            return [Retrieved(
+                chunk=Chunk(text="a", post_id=11, question_id=1), score=0.9)]
+
+    def fake_build(kind):
+        seen["kind"] = kind
+        return FakeRetriever()
+
+    monkeypatch.setattr(cli_mod, "build_retriever", fake_build)
+    testset = tmp_path / "t.json"
+    testset.write_text("[]")
+    result = CliRunner().invoke(
+        cli_mod.cli, ["eval", "--testset", str(testset), "--retriever", "rerank"])
+    assert result.exit_code == 0
+    assert seen["kind"] == "rerank"
