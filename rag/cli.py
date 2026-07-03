@@ -1,6 +1,8 @@
 import click
 from dotenv import load_dotenv
-from rag.factory import build_pipeline, build_retriever, build_all_retrievers
+from rag.factory import (build_pipeline, build_retriever, build_all_retrievers,
+                         build_dense_and_bm25)
+from rag.retrieve import HybridRetriever
 from rag.ingest import parse_posts
 from rag.eval.testset import build_testset, save_testset, load_testset
 from rag.eval.runner import run_eval
@@ -96,5 +98,30 @@ def eval_compare(testset_path, fetch):
         report = run_eval(cases, retriever, ks=ks, fetch_depth=fetch)
         click.echo(
             f"{name:<10}  {report.hit_at[1]:.2f}    {report.hit_at[5]:.2f}    "
+            f"{report.hit_at[10]:.2f}     {report.mrr:.2f}"
+        )
+
+
+@cli.command("eval-sweep")
+@click.option("--testset", "testset_path", default="data/eval/testset.json",
+              type=click.Path(exists=True), help="Test set JSON path.")
+@click.option("--weights", default="0,0.25,0.5,1.0",
+              help="Comma-separated BM25 weights to sweep.")
+@click.option("--fetch", default=50, help="Chunks to fetch before deduping.")
+def eval_sweep(testset_path, weights, fetch):
+    """Sweep BM25 fusion weights for the hybrid retriever and print a table."""
+    ks = (1, 5, 10)
+    if fetch <= max(ks):
+        raise click.BadParameter(f"--fetch must exceed {max(ks)}", param_hint="--fetch")
+    weight_values = [float(w) for w in weights.split(",")]
+    cases = load_testset(testset_path)
+    dense, sparse = build_dense_and_bm25()
+    click.echo(f"Setup 1 — hybrid weight sweep (n={len(cases)}, fetch={fetch})")
+    click.echo("bm25_weight   Hit@1   Hit@5   Hit@10   MRR")
+    for w in weight_values:
+        retriever = HybridRetriever([dense, sparse], weights=[1.0, w])
+        report = run_eval(cases, retriever, ks=ks, fetch_depth=fetch)
+        click.echo(
+            f"{w:<11}   {report.hit_at[1]:.2f}    {report.hit_at[5]:.2f}    "
             f"{report.hit_at[10]:.2f}     {report.mrr:.2f}"
         )

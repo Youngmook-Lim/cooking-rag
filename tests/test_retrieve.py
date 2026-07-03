@@ -80,3 +80,30 @@ def test_hybrid_rrf_fuses_two_rankings():
     assert [r.chunk.post_id for r in results] == [1, 3, 2, 9]
     # an item ranked by both retrievers outranks items ranked by only one
     assert results[0].chunk.post_id == 1
+
+
+def test_hybrid_weight_downweights_a_retriever():
+    from rag.retrieve import HybridRetriever, Retriever
+    from rag.models import Retrieved
+
+    def _r(post_id):
+        return Retrieved(
+            chunk=Chunk(text="x", post_id=post_id, question_id=1, chunk_index=0),
+            score=0.0)
+
+    class _Stub(Retriever):
+        def __init__(self, results):
+            self._results = results
+        def retrieve(self, query, k):
+            return self._results[:k]
+
+    dense = _Stub([_r(9), _r(1)])   # post 1 at dense rank 2
+    sparse = _Stub([_r(2)])         # post 2 at sparse rank 1
+
+    equal = HybridRetriever([dense, sparse], weights=[1.0, 1.0])
+    eq_ids = [r.chunk.post_id for r in equal.retrieve("q", k=5)]
+    assert eq_ids.index(2) < eq_ids.index(1)   # sparse-only post 2 outranks dense post 1
+
+    weighted = HybridRetriever([dense, sparse], weights=[1.0, 0.3])
+    w_ids = [r.chunk.post_id for r in weighted.retrieve("q", k=5)]
+    assert w_ids.index(1) < w_ids.index(2)     # down-weighting sparse flips the order

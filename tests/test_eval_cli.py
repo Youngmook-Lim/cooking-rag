@@ -84,3 +84,25 @@ def test_eval_compare_prints_row_per_retriever(tmp_path, monkeypatch):
     assert result.exit_code == 0
     for name in ("dense", "bm25", "hybrid"):
         assert name in result.output
+
+
+def test_eval_sweep_prints_row_per_weight(tmp_path, monkeypatch):
+    cases = [TestCase(question_id=1, query_text="q", accepted_post_id=11)]
+    monkeypatch.setattr(cli_mod, "load_testset", lambda p: cases)
+
+    class FakeRetriever:
+        def retrieve(self, query, k):
+            return [Retrieved(
+                chunk=Chunk(text="a", post_id=11, question_id=1), score=0.9)]
+
+    monkeypatch.setattr(cli_mod, "build_dense_and_bm25",
+                        lambda: (FakeRetriever(), FakeRetriever()))
+    testset = tmp_path / "t.json"
+    testset.write_text("[]")
+    result = CliRunner().invoke(
+        cli_mod.cli,
+        ["eval-sweep", "--testset", str(testset), "--weights", "0,0.5,1.0"])
+    assert result.exit_code == 0
+    assert "bm25_weight" in result.output
+    for w in ("0.0", "0.5", "1.0"):
+        assert w in result.output
