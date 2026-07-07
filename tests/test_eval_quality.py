@@ -122,6 +122,8 @@ class _StubAnswer:
 
 
 class _FakeGenerator:
+    min_score = 0.2
+
     def __init__(self, refused=False):
         self.refused = refused
 
@@ -179,6 +181,37 @@ def test_aggregate_quality_empty_is_zero():
     report = aggregate_quality([])
     assert report.n_cases == 0 and report.n_judged == 0
     assert report.mean_correctness == 0.0 and report.refusal_rate == 0.0
+
+
+def test_run_quality_eval_judges_only_used_sources():
+    from rag.generate import Generator
+
+    class _EchoLLM:
+        def complete(self, prompt):
+            return "answer text [11]"
+
+    class _CapturingJudge(Judge):
+        def __init__(self):
+            self.sources = None
+        def score(self, question, answer, sources, reference):
+            self.sources = sources
+            return 4, 5, "ok"
+
+    class _MixedRetriever:
+        def retrieve(self, query, k):
+            return [
+                Retrieved(chunk=Chunk(text="ABOVE threshold chunk", post_id=11,
+                                      question_id=1), score=0.9),
+                Retrieved(chunk=Chunk(text="BELOW threshold chunk", post_id=12,
+                                      question_id=1), score=0.1),
+            ]
+
+    judge = _CapturingJudge()
+    generator = Generator(llm=_EchoLLM(), min_score=0.2)
+    run_quality_eval([_case(accepted=11)], _MixedRetriever(), generator, judge,
+                     {11: "ref"}, k=5)
+    assert "ABOVE threshold chunk" in judge.sources
+    assert "BELOW threshold chunk" not in judge.sources
 
 
 @pytest.mark.slow

@@ -151,6 +151,7 @@ def test_eval_quality_writes_artifact_and_prints_summary(tmp_path, monkeypatch):
             return '{"correctness": 4, "faithfulness": 5, "rationale": "ok"}'
 
     monkeypatch.setattr(cli_mod, "build_llm", lambda *a, **k: FakeLLM())
+    monkeypatch.setattr(cli_mod, "build_judge_llm", lambda *a, **k: FakeLLM())
 
     testset = tmp_path / "t.json"; testset.write_text("[]")
     posts = tmp_path / "Posts.xml"; posts.write_text("<x/>")
@@ -165,6 +166,8 @@ def test_eval_quality_writes_artifact_and_prints_summary(tmp_path, monkeypatch):
     assert data["cases"][0]["faithfulness"] == 5
     assert "correctness" in result.output
     assert "retriever=dense" in result.output
+    assert "judge_model" in data["config"]
+    assert data["config"]["n_skipped"] == 0
 
 
 def test_eval_quality_skips_missing_reference(tmp_path, monkeypatch):
@@ -185,6 +188,7 @@ def test_eval_quality_skips_missing_reference(tmp_path, monkeypatch):
             return '{"correctness": 3, "faithfulness": 3, "rationale": "x"}'
 
     monkeypatch.setattr(cli_mod, "build_llm", lambda *a, **k: FakeLLM())
+    monkeypatch.setattr(cli_mod, "build_judge_llm", lambda *a, **k: FakeLLM())
 
     testset = tmp_path / "t.json"; testset.write_text("[]")
     posts = tmp_path / "Posts.xml"; posts.write_text("<x/>")
@@ -196,3 +200,5 @@ def test_eval_quality_skips_missing_reference(tmp_path, monkeypatch):
     assert "999" in result.output or "not found" in result.output.lower()
     data = json.loads(out.read_text())
     assert data["summary"]["n_judged"] == 0
+    assert data["config"]["n_skipped"] == 1
+    assert "no cases judged" in result.output

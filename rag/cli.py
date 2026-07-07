@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 from dotenv import load_dotenv
 from rag.factory import (build_pipeline, build_retriever, build_all_retrievers,
-                         build_dense_and_bm25, build_llm)
+                         build_dense_and_bm25, build_llm, build_judge_llm)
 from rag.retrieve import HybridRetriever
 from rag.ingest import parse_posts
 from rag.eval.testset import build_testset, save_testset, load_testset
@@ -160,9 +160,10 @@ def eval_quality(testset_path, posts_xml, kind, n, seed, k, out):
             click.echo(
                 f"warning: accepted answer {c.accepted_post_id} for question "
                 f"{c.question_id} not found in Posts.xml; skipping", err=True)
-    llm = build_llm(temperature=0.0)
-    generator = Generator(llm=llm, min_score=0.2)
-    judge = LLMJudge(llm)
+    gen_llm = build_llm(temperature=0.0)
+    judge_llm = build_judge_llm(temperature=0.0)
+    generator = Generator(llm=gen_llm, min_score=0.2)
+    judge = LLMJudge(judge_llm)
     retriever = build_retriever(kind)
     report, results = run_quality_eval(
         kept, retriever, generator, judge, reference_texts, k=k)
@@ -170,8 +171,10 @@ def eval_quality(testset_path, posts_xml, kind, n, seed, k, out):
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         out = f"data/eval/quality/{kind}-{stamp}.json"
     artifact = {
-        "config": {"retriever": kind, "n": report.n_cases, "seed": seed, "k": k,
-                   "model": getattr(llm, "_model", "unknown")},
+        "config": {"retriever": kind, "n": len(sample),
+                   "n_skipped": len(sample) - len(kept), "seed": seed, "k": k,
+                   "model": getattr(gen_llm, "_model", "unknown"),
+                   "judge_model": getattr(judge_llm, "_model", "unknown")},
         "summary": {"mean_correctness": report.mean_correctness,
                     "mean_faithfulness": report.mean_faithfulness,
                     "refusal_rate": report.refusal_rate,
@@ -184,9 +187,11 @@ def eval_quality(testset_path, posts_xml, kind, n, seed, k, out):
     p.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
     refused = report.n_cases - report.n_judged - report.n_judge_errors
     note = f"   [{refused} refused]" if refused else ""
-    click.echo(
-        f"Answer quality (n={report.n_judged}, retriever={kind}, k={k}){note}")
-    click.echo("correctness  faithfulness")
-    click.echo(
-        f"{report.mean_correctness:.2f}         {report.mean_faithfulness:.2f}")
+    click.echo(f"Answer quality (n={report.n_judged}, retriever={kind}, k={k}){note}")
+    if report.n_judged:
+        click.echo("correctness  faithfulness")
+        click.echo(
+            f"{report.mean_correctness:.2f}         {report.mean_faithfulness:.2f}")
+    else:
+        click.echo("no cases judged")
     click.echo(f"\nWrote artifact to {out}.")

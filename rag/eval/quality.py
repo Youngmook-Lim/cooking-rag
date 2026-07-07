@@ -120,7 +120,8 @@ def run_quality_eval(cases, retriever, generator, judge, reference_texts, k=5):
                 refused=True))
             continue
         reference = reference_texts.get(case.accepted_post_id, "")
-        sources = render_sources(retrieved)
+        used = [r for r in retrieved if r.score >= generator.min_score]
+        sources = render_sources(used)
         try:
             correctness, faithfulness, rationale = judge.score(
                 case.query_text, ans.text, sources, reference)
