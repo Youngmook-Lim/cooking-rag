@@ -105,3 +105,50 @@ class LLMJudge(Judge):
         raw = self.llm.complete(
             build_judge_prompt(question, answer, sources, reference))
         return parse_verdict(raw)
+
+
+def run_quality_eval(cases, retriever, generator, judge, reference_texts, k=5):
+    results: list[QualityResult] = []
+    for case in cases:
+        retrieved = retriever.retrieve(case.query_text, k=k)
+        ans = generator.answer(case.query_text, retrieved)
+        if ans.refused:
+            results.append(QualityResult(
+                question_id=case.question_id, query=case.query_text,
+                answer=ans.text, cited_post_ids=ans.cited_post_ids,
+                correctness=None, faithfulness=None, rationale="",
+                refused=True))
+            continue
+        reference = reference_texts.get(case.accepted_post_id, "")
+        sources = render_sources(retrieved)
+        try:
+            correctness, faithfulness, rationale = judge.score(
+                case.query_text, ans.text, sources, reference)
+        except JudgeParseError as exc:
+            results.append(QualityResult(
+                question_id=case.question_id, query=case.query_text,
+                answer=ans.text, cited_post_ids=ans.cited_post_ids,
+                correctness=None, faithfulness=None, rationale=str(exc),
+                judge_error=True))
+            continue
+        results.append(QualityResult(
+            question_id=case.question_id, query=case.query_text,
+            answer=ans.text, cited_post_ids=ans.cited_post_ids,
+            correctness=correctness, faithfulness=faithfulness,
+            rationale=rationale))
+    return aggregate_quality(results), results
+
+
+def aggregate_quality(results: list[QualityResult]) -> QualityReport:
+    n = len(results)
+    judged = [r for r in results if not r.refused and not r.judge_error]
+    n_judged = len(judged)
+    n_refused = sum(1 for r in results if r.refused)
+    n_errors = sum(1 for r in results if r.judge_error)
+    mean_c = sum(r.correctness for r in judged) / n_judged if n_judged else 0.0
+    mean_f = sum(r.faithfulness for r in judged) / n_judged if n_judged else 0.0
+    refusal_rate = n_refused / n if n else 0.0
+    return QualityReport(
+        n_cases=n, n_judged=n_judged, mean_correctness=mean_c,
+        mean_faithfulness=mean_f, refusal_rate=refusal_rate,
+        n_judge_errors=n_errors)
