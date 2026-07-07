@@ -41,3 +41,60 @@ def test_quality_result_and_report_construct():
 
 def test_judge_parse_error_is_value_error():
     assert issubclass(JudgeParseError, ValueError)
+
+
+import pytest
+from rag.eval.quality import Judge, FakeJudge, LLMJudge, parse_verdict
+
+
+class _CannedLLM:
+    def __init__(self, reply):
+        self.reply = reply
+        self.last_prompt = None
+
+    def complete(self, prompt):
+        self.last_prompt = prompt
+        return self.reply
+
+
+def test_parse_verdict_reads_scores_and_rationale():
+    c, f, r = parse_verdict('{"correctness": 4, "faithfulness": 5, "rationale": "good"}')
+    assert (c, f, r) == (4, 5, "good")
+
+
+def test_parse_verdict_tolerates_surrounding_text():
+    c, f, r = parse_verdict('Sure!\n{"correctness": 3, "faithfulness": 2, "rationale": "x"}\ndone')
+    assert (c, f) == (3, 2)
+
+
+def test_parse_verdict_rejects_non_json():
+    with pytest.raises(JudgeParseError):
+        parse_verdict("no json here")
+
+
+def test_parse_verdict_rejects_out_of_range():
+    with pytest.raises(JudgeParseError):
+        parse_verdict('{"correctness": 9, "faithfulness": 5, "rationale": "x"}')
+
+
+def test_llm_judge_builds_prompt_and_parses():
+    llm = _CannedLLM('{"correctness": 5, "faithfulness": 4, "rationale": "ok"}')
+    judge = LLMJudge(llm)
+    c, f, r = judge.score("q", "a", "[1] src", "ref")
+    assert (c, f, r) == (5, 4, "ok")
+    assert "q" in llm.last_prompt and "ref" in llm.last_prompt
+
+
+def test_llm_judge_raises_on_malformed():
+    judge = LLMJudge(_CannedLLM("garbage"))
+    with pytest.raises(JudgeParseError):
+        judge.score("q", "a", "s", "ref")
+
+
+def test_fake_judge_is_deterministic_and_in_range():
+    judge = FakeJudge()
+    c1, f1, _ = judge.score("q", "oil added too fast", "[1] add oil slowly", "oil too fast")
+    c2, f2, _ = judge.score("q", "oil added too fast", "[1] add oil slowly", "oil too fast")
+    assert (c1, f1) == (c2, f2)
+    assert 1 <= c1 <= 5 and 1 <= f1 <= 5
+    assert isinstance(judge, Judge)

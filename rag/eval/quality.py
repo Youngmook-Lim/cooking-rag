@@ -1,3 +1,5 @@
+import json
+import re
 from dataclasses import dataclass
 from rag.models import Retrieved
 
@@ -50,3 +52,56 @@ def build_judge_prompt(question: str, answer: str, sources: str, reference: str)
         "Respond with ONLY a JSON object and nothing else:\n"
         '{"correctness": N, "faithfulness": N, "rationale": "one sentence"}'
     )
+
+
+class Judge:
+    def score(self, question: str, answer: str, sources: str,
+              reference: str) -> tuple[int, int, str]:
+        raise NotImplementedError
+
+
+def _overlap_score(a: str, b: str) -> int:
+    at = set(a.lower().split())
+    bt = set(b.lower().split())
+    if not at or not bt:
+        return 1
+    frac = len(at & bt) / len(at)
+    return max(1, min(5, 1 + round(frac * 4)))
+
+
+class FakeJudge(Judge):
+    """Deterministic, offline judge: word-overlap proxy bucketed to 1-5."""
+
+    def score(self, question, answer, sources, reference):
+        correctness = _overlap_score(answer, reference)
+        faithfulness = _overlap_score(answer, sources)
+        return correctness, faithfulness, "fake judge: overlap-based score"
+
+
+def parse_verdict(raw: str) -> tuple[int, int, str]:
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise JudgeParseError(f"no JSON object in judge output: {raw!r}")
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError as exc:
+        raise JudgeParseError(f"invalid JSON in judge output: {raw!r}") from exc
+    try:
+        correctness = int(data["correctness"])
+        faithfulness = int(data["faithfulness"])
+        rationale = str(data.get("rationale", ""))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise JudgeParseError(f"missing/invalid fields in judge output: {raw!r}") from exc
+    if not (1 <= correctness <= 5 and 1 <= faithfulness <= 5):
+        raise JudgeParseError(f"scores out of range 1-5: {raw!r}")
+    return correctness, faithfulness, rationale
+
+
+class LLMJudge(Judge):
+    def __init__(self, llm):
+        self.llm = llm
+
+    def score(self, question, answer, sources, reference):
+        raw = self.llm.complete(
+            build_judge_prompt(question, answer, sources, reference))
+        return parse_verdict(raw)
