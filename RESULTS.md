@@ -50,6 +50,14 @@ wins. BM25 adds no value on this corpus (short title queries vs answer vocabular
 weighted RRF is **explored and rejected**; dense + bge prefix remains the best retriever.
 The weighted `HybridRetriever` and the `eval-sweep` tool remain for future use.
 
+## Answer-quality metric methodology
+
+- Generation and judging use the same model by default; set `OPENROUTER_JUDGE_MODEL` to
+  judge with an independent model and avoid self-preference bias. Each run's artifact
+  records both `model` and `judge_model`.
+- Faithfulness is scored only against the chunks the answer was actually built from
+  (`score >= min_score`), not the full retrieved set.
+
 ## Backlog (planned experiments)
 
 Each should add a row above when run. See the project notes for cost/effort.

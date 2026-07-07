@@ -71,3 +71,15 @@ def test_generator_refuses_when_scores_too_low():
     gen = Generator(llm=FakeLLM(), min_score=0.5)
     ans = gen.answer("unrelated", [_r("noise", 1, 0.1)])
     assert ans.refused is True
+
+
+def test_openrouter_llm_omits_temperature_by_default():
+    client = FakeOpenAIClient(reply="ok")
+    OpenRouterLLM(model="m", client=client).complete("hi")
+    assert "temperature" not in client.received
+
+
+def test_openrouter_llm_passes_temperature_when_set():
+    client = FakeOpenAIClient(reply="ok")
+    OpenRouterLLM(model="m", client=client, temperature=0).complete("hi")
+    assert client.received["temperature"] == 0

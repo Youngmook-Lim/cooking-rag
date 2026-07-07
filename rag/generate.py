@@ -32,7 +32,7 @@ class LLM:
 
 
 class OpenRouterLLM(LLM):
-    def __init__(self, model: str, client=None):
+    def __init__(self, model: str, client=None, temperature: float | None = None):
         if client is None:
             from openai import OpenAI
             client = OpenAI(
@@ -41,13 +41,17 @@ class OpenRouterLLM(LLM):
             )
         self._client = client
         self._model = model
+        self._temperature = temperature
 
     def complete(self, prompt: str) -> str:
-        resp = self._client.chat.completions.create(
+        kwargs = dict(
             model=self._model,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
+        if self._temperature is not None:
+            kwargs["temperature"] = self._temperature
+        resp = self._client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content
 
 

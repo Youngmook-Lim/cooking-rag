@@ -18,6 +18,18 @@ def _model_name() -> str:
     return os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
 
 
+def _judge_model_name() -> str:
+    return os.environ.get("OPENROUTER_JUDGE_MODEL", _model_name())
+
+
+def build_llm(temperature: float | None = None) -> OpenRouterLLM:
+    return OpenRouterLLM(model=_model_name(), temperature=temperature)
+
+
+def build_judge_llm(temperature: float | None = 0.0) -> OpenRouterLLM:
+    return OpenRouterLLM(model=_judge_model_name(), temperature=temperature)
+
+
 def _embedder_and_store():
     embedder = SentenceTransformerEmbedder()
     store = ChromaStore(collection=COLLECTION, persist_dir=PERSIST_DIR)
@@ -69,5 +81,5 @@ def build_pipeline() -> RagPipeline:
         embedder=embedder,
         store=store,
         retriever=DenseRetriever(embedder=embedder, store=store),
-        generator=Generator(llm=OpenRouterLLM(model=_model_name()), min_score=0.2),
+        generator=Generator(llm=build_llm(), min_score=0.2),
     )

@@ -15,3 +15,34 @@ def test_model_name_reads_env(monkeypatch):
 def test_build_retriever_rejects_unknown_kind():
     with pytest.raises(ValueError):
         build_retriever("bogus")
+
+
+def test_build_llm_uses_model_from_env(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_MODEL", "some/model")
+    from rag.factory import build_llm
+    llm = build_llm()
+    assert llm._model == "some/model"
+    assert llm._temperature is None
+
+
+def test_build_llm_forwards_temperature(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    from rag.factory import build_llm
+    assert build_llm(temperature=0.0)._temperature == 0.0
+
+
+def test_build_judge_llm_uses_judge_model_env(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_MODEL", "gen/model")
+    monkeypatch.setenv("OPENROUTER_JUDGE_MODEL", "judge/model")
+    from rag.factory import build_judge_llm
+    assert build_judge_llm()._model == "judge/model"
+
+
+def test_build_judge_llm_falls_back_to_generator_model(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_MODEL", "gen/model")
+    monkeypatch.delenv("OPENROUTER_JUDGE_MODEL", raising=False)
+    from rag.factory import build_judge_llm
+    assert build_judge_llm()._model == "gen/model"

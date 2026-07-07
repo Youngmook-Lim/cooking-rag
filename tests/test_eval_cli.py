@@ -1,3 +1,4 @@
+import json
 from click.testing import CliRunner
 from rag.models import Document, Chunk, Retrieved
 from rag.eval.models import TestCase
@@ -129,3 +130,75 @@ def test_eval_accepts_rerank_retriever(tmp_path, monkeypatch):
         cli_mod.cli, ["eval", "--testset", str(testset), "--retriever", "rerank"])
     assert result.exit_code == 0
     assert seen["kind"] == "rerank"
+
+
+def test_eval_quality_writes_artifact_and_prints_summary(tmp_path, monkeypatch):
+    cases = [TestCase(question_id=1, query_text="why did mayo break?",
+                      accepted_post_id=11)]
+    monkeypatch.setattr(cli_mod, "load_testset", lambda p: cases)
+    docs = [Document(post_id=11, question_id=1, title="", body="oil added too fast")]
+    monkeypatch.setattr(cli_mod, "parse_posts", lambda p: docs)
+
+    class FakeRetriever:
+        def retrieve(self, query, k):
+            return [Retrieved(chunk=Chunk(text="oil added too fast", post_id=11,
+                                          question_id=1), score=0.9)]
+
+    monkeypatch.setattr(cli_mod, "build_retriever", lambda kind="dense": FakeRetriever())
+
+    class FakeLLM:
+        def complete(self, prompt):
+            return '{"correctness": 4, "faithfulness": 5, "rationale": "ok"}'
+
+    monkeypatch.setattr(cli_mod, "build_llm", lambda *a, **k: FakeLLM())
+    monkeypatch.setattr(cli_mod, "build_judge_llm", lambda *a, **k: FakeLLM())
+
+    testset = tmp_path / "t.json"; testset.write_text("[]")
+    posts = tmp_path / "Posts.xml"; posts.write_text("<x/>")
+    out = tmp_path / "q.json"
+    result = CliRunner().invoke(cli_mod.cli, [
+        "eval-quality", "--testset", str(testset), "--posts", str(posts),
+        "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert out.exists()
+    data = json.loads(out.read_text())
+    assert data["summary"]["mean_correctness"] == 4.0
+    assert data["cases"][0]["faithfulness"] == 5
+    assert "correctness" in result.output
+    assert "retriever=dense" in result.output
+    assert "judge_model" in data["config"]
+    assert data["config"]["n_skipped"] == 0
+
+
+def test_eval_quality_skips_missing_reference(tmp_path, monkeypatch):
+    cases = [TestCase(question_id=7, query_text="q", accepted_post_id=999)]
+    monkeypatch.setattr(cli_mod, "load_testset", lambda p: cases)
+    docs = [Document(post_id=11, question_id=1, title="", body="unrelated")]
+    monkeypatch.setattr(cli_mod, "parse_posts", lambda p: docs)
+
+    class FakeRetriever:
+        def retrieve(self, query, k):
+            return [Retrieved(chunk=Chunk(text="x", post_id=11, question_id=1),
+                              score=0.9)]
+
+    monkeypatch.setattr(cli_mod, "build_retriever", lambda kind="dense": FakeRetriever())
+
+    class FakeLLM:
+        def complete(self, prompt):
+            return '{"correctness": 3, "faithfulness": 3, "rationale": "x"}'
+
+    monkeypatch.setattr(cli_mod, "build_llm", lambda *a, **k: FakeLLM())
+    monkeypatch.setattr(cli_mod, "build_judge_llm", lambda *a, **k: FakeLLM())
+
+    testset = tmp_path / "t.json"; testset.write_text("[]")
+    posts = tmp_path / "Posts.xml"; posts.write_text("<x/>")
+    out = tmp_path / "q.json"
+    result = CliRunner().invoke(cli_mod.cli, [
+        "eval-quality", "--testset", str(testset), "--posts", str(posts),
+        "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "999" in result.output or "not found" in result.output.lower()
+    data = json.loads(out.read_text())
+    assert data["summary"]["n_judged"] == 0
+    assert data["config"]["n_skipped"] == 1
+    assert "no cases judged" in result.output
