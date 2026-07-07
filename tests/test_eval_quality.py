@@ -179,3 +179,17 @@ def test_aggregate_quality_empty_is_zero():
     report = aggregate_quality([])
     assert report.n_cases == 0 and report.n_judged == 0
     assert report.mean_correctness == 0.0 and report.refusal_rate == 0.0
+
+
+@pytest.mark.slow
+def test_llm_judge_scores_correct_above_wrong():
+    from rag.factory import build_llm
+    judge = LLMJudge(build_llm())
+    question = "Why did my mayonnaise break?"
+    good = "The emulsion broke because the oil was added too quickly to combine."
+    bad = "Bake it at 450 degrees Fahrenheit for about twenty minutes."
+    reference = "Mayonnaise breaks when the oil is added too fast to emulsify."
+    sources = "[1] Add the oil slowly so the emulsion can hold together."
+    c_good, _, _ = judge.score(question, good, sources, reference)
+    c_bad, _, _ = judge.score(question, bad, sources, reference)
+    assert c_good > c_bad
