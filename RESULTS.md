@@ -82,12 +82,35 @@ families.
 
 **Caveat (confounds the rerank number — follow-up):** the generator's refusal gate
 `min_score = 0.2` and the faithfulness "used-chunks" filter are applied to the
-retriever's raw scores — cosine similarities for dense (0–1) but cross-encoder logits
-for rerank (a different scale). This produces the 2 rerank-only refusals and means the
-reranked generator is gated by a cosine-tuned threshold on logit-scale scores. The
-paired gap (−0.60) is large enough that fixing this is unlikely to reverse the verdict,
-but treat the rerank scores as approximate until the threshold is made retriever-aware
-(normalize reranker scores, or scale/skip the gate for rerank).
+retriever's raw scores — cosine similarities for dense (0–1) but cross-encoder scores
+for rerank (a different scale). Treat the rerank scores as approximate until the
+threshold is made retriever-aware. See the investigation below.
+
+### Why rerank underperforms — investigation (2026-07-08)
+
+Diagnostics on the failing cases (re-running retrieval only, no API) found **two
+distinct, real causes — not an eval bug**:
+
+1. **The cross-encoder genuinely mis-ranks some queries.** For *"How can I handle black
+   pepper without sneezing?"* `bge-reranker-base` promoted chili/bell-pepper chunks
+   (capsaicin burn, ripening peppers in a paper bag) to the top — word-sense confusion on
+   "pepper." Those cleared the threshold, so the generator got five chunks — just the
+   *wrong* five → off-topic answer (correctness 1 vs dense's 5). Independent of any gate.
+
+2. **The `min_score = 0.2` gate starves the reranker (scale mismatch), and it's
+   widespread.** Dense's cosine scores (0.7–0.83) always clear 0.2; the cross-encoder's
+   scores are on a different scale (~0.09–0.96), so the same cutoff drops chunks in
+   **21/50 rerank cases** — avg **3.84** usable chunks in the top-5 vs **5.00** for dense
+   (dense is *never* starved). Example — *"Cooking French fries with an IKEA strainer"*:
+   the relevant answer was rank 1 for dense (cosine 0.77), but the reranker demoted it to
+   rank 4 **and** its score (0.175) fell below 0.2, so the generator never saw it → the
+   answer didn't mention the strainer and cited nothing. This starvation also explains
+   rerank's shorter answers (787 vs 1002 chars) and fewer citations (1.90 vs 2.58 posts).
+
+Effect #1 is a genuine reranker weakness (independent of the threshold); effect #2 is a
+harness artifact that inflates the gap. Dense still wins on the un-starved cases, so the
+**direction holds** (dense > rerank), but the −0.60 magnitude overstates it. A fair
+re-measurement needs a retriever-aware `min_score` (see backlog) — deferred for now.
 
 ## Backlog (planned experiments)
 
