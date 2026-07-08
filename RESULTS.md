@@ -58,12 +58,44 @@ The weighted `HybridRetriever` and the `eval-sweep` tool remain for future use.
 - Faithfulness is scored only against the chunks the answer was actually built from
   (`score >= min_score`), not the full retrieved set.
 
+## Answer quality (LLM-judged) — dense vs rerank (2026-07-08)
+
+First run of the answer-quality metric: 50 held-out questions (seed 42, same testset),
+generation `anthropic/claude-sonnet-4` @ temp 0, judge `openai/gpt-4o` (independent
+family — avoids self-preference bias). Scores 1–5, higher is better.
+
+| Retriever | n_judged | Correctness | Faithfulness | Refusals |
+|-----------|----------|-------------|--------------|----------|
+| dense (bge prefix)                 | 50 | 4.00 | 4.48 | 0 |
+| dense + rerank (bge-reranker-base) | 48 | 3.46 | 4.25 | 2 |
+
+Paired on the 48 questions **both** answered: dense correctness 4.06 vs rerank 3.46
+(−0.60), faithfulness 4.48 vs 4.25 (−0.23); per question, rerank is better on 7, worse
+on 17, tied on 24.
+
+**Result: the reranker loses on answer quality too.** This metric was built on the
+hypothesis that accepted-ID Hit@k was *unfairly* harsh on the reranker (it promotes
+topically-relevant non-accepted chunks — see the cross-encoder note above). An
+independent judge does **not** vindicate it: dense produces better answers, not just
+better accepted-ID hits. Dense + bge prefix remains the best config on both metric
+families.
+
+**Caveat (confounds the rerank number — follow-up):** the generator's refusal gate
+`min_score = 0.2` and the faithfulness "used-chunks" filter are applied to the
+retriever's raw scores — cosine similarities for dense (0–1) but cross-encoder logits
+for rerank (a different scale). This produces the 2 rerank-only refusals and means the
+reranked generator is gated by a cosine-tuned threshold on logit-scale scores. The
+paired gap (−0.60) is large enough that fixing this is unlikely to reverse the verdict,
+but treat the rerank scores as approximate until the threshold is made retriever-aware
+(normalize reranker scores, or scale/skip the gate for rerank).
+
 ## Backlog (planned experiments)
 
 Each should add a row above when run. See the project notes for cost/effort.
 
-- **LLM-judge answer-quality metric (faithfulness + correctness)** — now the priority;
-  prerequisite to fairly evaluate reranking (see cross-encoder note above)
+- **Retriever-aware refusal/faithfulness threshold** — `min_score = 0.2` is cosine-tuned
+  but is applied to cross-encoder logits for rerank (see caveat above); normalize
+  reranker scores or scale/skip the gate so answer-quality comparisons are apples-to-apples
 - OpenAI embeddings (`text-embedding-3-small`/`-large`; rebuild index)
 - chunking sweep (`max_words`/`overlap`; sentence/semantic chunking)
 - query preprocessing (expansion / HyDE / decomposition)
